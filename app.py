@@ -8,12 +8,56 @@ import traceback
 
 st.set_page_config(page_title="Enterprise SQL Client", layout="wide", initial_sidebar_state="expanded")
 
-# Load configuration
+# --- PERSISTENT USER DATABASE SETUP ---
+def init_user_db():
+    conn = sqlite3.connect("users.db", check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            email TEXT,
+            name TEXT,
+            password TEXT,
+            role TEXT
+        )
+    ''')
+    # Insert default admin if table is empty
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        default_pass = stauth.Hasher.hash("Admin123!")
+        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", 
+                       ("admin", "admin@enterprise.com", "System Administrator", default_pass, "admin"))
+        conn.commit()
+    conn.close()
+
+init_user_db()
+
+# Load users dynamically from persistent SQLite into authenticator structure
+def load_credentials_from_db():
+    conn = sqlite3.connect("users.db", check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, email, name, password, role FROM users")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    credentials = {"usernames": {}}
+    for row in rows:
+        credentials["usernames"][row[0]] = {
+            "email": row[1],
+            "name": row[2],
+            "password": row[3],
+            "role": row[4]
+        }
+    return credentials
+
+# Load configuration cookie settings
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
+db_credentials = load_credentials_from_db()
+
 authenticator = stauth.Authenticate(
-    config['credentials'],
+    db_credentials,
     config['cookie']['name'],
     config['cookie']['key'],
     config['cookie']['expiry_days']
@@ -26,11 +70,10 @@ if auth_selection == "Login":
     authenticator.login(location='main', key='login_widget')
     
     if st.session_state.get("authentication_status") == True:
-        # Secure Logout Action in Sidebar
         authenticator.logout("Logout", "sidebar", key="enterprise_logout")
         name = st.session_state.get("name")
         username = st.session_state.get("username")
-        user_role = config['credentials']['usernames'].get(username, {}).get('role', 'viewer')
+        user_role = db_credentials['usernames'].get(username, {}).get('role', 'viewer')
         
         st.sidebar.markdown(f"**Logged in as:** {name} (`{user_role.upper()}`)")
         st.sidebar.divider()
@@ -45,7 +88,7 @@ if auth_selection == "Login":
         try:
             if source_type == "SQLite (Local)":
                 db_file = st.sidebar.text_input("Database Filename", "enterprise_prod.db")
-                conn = sqlite3.connect(db_file)
+                conn = sqlite3.connect(db_file, check_same_thread=False)
                 conn.row_factory = sqlite3.Row
                 engine_ready = True
 
@@ -61,7 +104,6 @@ if auth_selection == "Login":
                         else:
                             df_upload = pd.read_excel(uploaded_file)
                         
-                        # Use a persistent local db file so it survives script reruns
                         conn = sqlite3.connect("uploaded_data.db", check_same_thread=False)
                         df_upload.to_sql(table_name, conn, index=False, if_exists="replace")
                         conn.row_factory = sqlite3.Row
@@ -82,7 +124,6 @@ if auth_selection == "Login":
         except Exception as conn_err:
             st.sidebar.error(f"Connection error: {conn_err}")
 
-        # Fallback check for persistent uploaded file connection across reruns
         if source_type == "Upload CSV/Excel" and not engine_ready:
             try:
                 conn = sqlite3.connect("uploaded_data.db", check_same_thread=False)
@@ -164,19 +205,17 @@ elif auth_selection == "Create Account":
                 st.error("Please fill in all required fields.")
             elif new_password != new_confirm_password:
                 st.error("Passwords do not match.")
-            elif new_username in config['credentials']['usernames']:
+            elif new_username in db_credentials['usernames']:
                 st.error("Username already exists. Please choose a different one.")
             else:
                 hashed_password = stauth.Hasher.hash(new_password)
                 
-                config['credentials']['usernames'][new_username] = {
-                    'email': new_email,
-                    'name': new_name,
-                    'password': hashed_password,
-                    'role': 'viewer'
-                }
-                
-                with open('config.yaml', 'w') as file:
-                    yaml.dump(config, file, default_flow_style=False)
+                # Save into persistent users.db sqlite table
+                conn = sqlite3.connect("users.db", check_same_thread=False)
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)",
+                               (new_username, new_email, new_name, hashed_password, 'viewer'))
+                conn.commit()
+                conn.close()
                 
                 st.success("Account successfully created! Switch to the 'Login' view to sign in.")
