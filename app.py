@@ -117,7 +117,30 @@ if auth_selection == "Login":
                 db_password = st.sidebar.text_input("DB Password", type="password")
                 
                 if st.sidebar.button("Test & Connect"):
-                    st.sidebar.success("Connection parameters captured successfully.")
+                    try:
+                        if source_type == "PostgreSQL":
+                            import psycopg2
+                            conn = psycopg2.connect(
+                                host=host, port=port, database=database, user=db_user, password=db_password
+                            )
+                            engine_ready = True
+                            st.sidebar.success("Successfully connected to PostgreSQL!")
+                        elif source_type == "MySQL":
+                            import pymysql
+                            conn = pymysql.connect(
+                                host=host, port=int(port), database=database, user=db_user, password=db_password
+                            )
+                            engine_ready = True
+                            st.sidebar.success("Successfully connected to MySQL!")
+                        elif source_type == "SQL Server":
+                            import pyodbc
+                            conn = pyodbc.connect(
+                                f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={host},{port};DATABASE={database};UID={db_user};PWD={db_password}"
+                            )
+                            engine_ready = True
+                            st.sidebar.success("Successfully connected to SQL Server!")
+                    except Exception as ext_err:
+                        st.sidebar.error(f"Remote connection failed: {ext_err}")
 
         except Exception as conn_err:
             st.sidebar.error(f"Connection error: {conn_err}")
@@ -206,7 +229,6 @@ elif auth_selection == "Create Account":
             elif new_username in db_credentials['usernames']:
                 st.error("Username already exists. Please choose a different one.")
             else:
-                # Hash password securely using direct bcrypt
                 hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 
                 conn = sqlite3.connect("users.db", check_same_thread=False)
