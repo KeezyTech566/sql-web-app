@@ -110,7 +110,7 @@ if auth_selection == "Login":
 
             elif source_type in ["PostgreSQL", "MySQL", "SQL Server"]:
                 st.sidebar.info(f"Configuring connection to remote {source_type} instance.")
-                host = st.sidebar.text_input("Host Address", "localhost")
+                host = st.sidebar.text_input("Host Address", "your-cloud-db-host.com")
                 port = st.sidebar.text_input("Port", "5432" if source_type == "PostgreSQL" else "3306")
                 database = st.sidebar.text_input("Database Name")
                 db_user = st.sidebar.text_input("DB User")
@@ -121,10 +121,10 @@ if auth_selection == "Login":
                         if source_type == "PostgreSQL":
                             import psycopg2
                             conn = psycopg2.connect(
-                                host=host, port=port, database=database, user=db_user, password=db_password
+                                host=host, port=port, database=database, user=db_user, password=db_password, sslmode='require'
                             )
                             engine_ready = True
-                            st.sidebar.success("Successfully connected to PostgreSQL!")
+                            st.sidebar.success("Successfully connected to cloud PostgreSQL!")
                         elif source_type == "MySQL":
                             import pymysql
                             conn = pymysql.connect(
