@@ -1,8 +1,7 @@
-from flask import Flask, render_template, request, jsonify
+import streamlit as st
 import sqlite3
+import pandas as pd
 import traceback
-
-app = Flask(__name__)
 
 DB_NAME = 'database.db'
 
@@ -11,52 +10,51 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+st.title("SQL Web Application & Database Query Tool")
+st.markdown("Enter your SQL query below to execute statements or query your SQLite database.")
 
-@app.route('/api/query', methods=['POST'])
-def run_query():
-    try:
-        data = request.get_json()
-        if not data or 'query' not in data:
-            return jsonify({'error': 'Invalid JSON request'}), 400
-            
-        sql_query = data.get('query', '').strip()
-        if not sql_query:
-            return jsonify({'error': 'Query cannot be empty'}), 400
+sql_query = st.text_area("SQL Query:", height=150, placeholder="SELECT * FROM your_table;")
 
-        upper_query = sql_query.upper()
+if st.button("Run Query"):
+    cleaned_query = sql_query.strip()
+    
+    if not cleaned_query:
+        st.error("Query cannot be empty.")
+    else:
+        upper_query = cleaned_query.upper()
         if 'DROP DATABASE' in upper_query or 'DROP TABLE' in upper_query:
-            return jsonify({'error': 'Destructive DROP operations are restricted.'}), 403
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        if ';' in sql_query[:-1] or 'CREATE TABLE' in upper_query:
-            cursor.executescript(sql_query)
-            conn.commit()
-            conn.close()
-            return jsonify({'message': 'Table created / Script executed successfully.', 'row_count': 0})
+            st.error("Destructive DROP operations are restricted.")
         else:
-            cursor.execute(sql_query)
-            if upper_query.startswith('SELECT'):
-                rows = cursor.fetchall()
-                columns = [description[0] for description in cursor.description] if cursor.description else []
-                result_rows = [dict(zip(columns, row)) for row in rows]
-                conn.close()
-                return jsonify({'columns': columns, 'rows': result_rows, 'row_count': len(result_rows)})
-            else:
-                conn.commit()
-                row_count = cursor.rowcount
-                conn.close()
-                return jsonify({'message': 'Query executed successfully.', 'row_count': row_count})
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
                 
-    except Exception as e:
-        print("\n--- ERROR TRACEBACK ---")
-        traceback.print_exc()
-        print("-----------------------\n")
-        return jsonify({'error': str(e)}), 400
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+                if ';' in cleaned_query[:-1] or 'CREATE TABLE' in upper_query:
+                    cursor.executescript(cleaned_query)
+                    conn.commit()
+                    conn.close()
+                    st.success("Table created / Script executed successfully.")
+                else:
+                    cursor.execute(cleaned_query)
+                    if upper_query.startswith('SELECT'):
+                        rows = cursor.fetchall()
+                        columns = [description[0] for description in cursor.description] if cursor.description else []
+                        result_rows = [dict(zip(columns, row)) for row in rows]
+                        conn.close()
+                        
+                        st.success(f"Query executed successfully. Total rows: {len(result_rows)}")
+                        if result_rows:
+                            df = pd.DataFrame(result_rows)
+                            st.dataframe(df, use_container_width=True)
+                        else:
+                            st.info("Query returned 0 rows.")
+                    else:
+                        conn.commit()
+                        row_count = cursor.rowcount
+                        conn.close()
+                        st.success(f"Query executed successfully. Rows affected: {row_count}")
+                        
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                with st.expander("View Error Details"):
+                    st.code(traceback.format_exc())
