@@ -47,8 +47,8 @@ elif auth_selection == "Create Account":
             elif new_username in config['credentials']['usernames']:
                 st.error("Username already exists. Please choose a different one.")
             else:
-                # 2. Hash the user-submitted password securely
-                hashed_password = stauth.Hasher([new_password]).generate()[0]
+                # 2. Hash the user-submitted password securely using the correct class method
+                hashed_password = stauth.Hasher.hash(new_password)
                 
                 # 3. Add the user to the config structure
                 config['credentials']['usernames'][new_username] = {
