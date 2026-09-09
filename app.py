@@ -110,13 +110,13 @@ if auth_selection == "Login":
 
             elif source_type in ["PostgreSQL", "MySQL", "SQL Server"]:
                 st.sidebar.info(f"Configuring connection to remote {source_type} instance.")
-                host = st.sidebar.text_input("Host Address", "your-cloud-db-host.com")
+                host = st.sidebar.text_input("Host Address", "tsl-db.postgres.database.azure.com")
                 port = st.sidebar.text_input("Port", "5432" if source_type == "PostgreSQL" else "3306")
-                database = st.sidebar.text_input("Database Name")
-                db_user = st.sidebar.text_input("DB User")
+                database = st.sidebar.text_input("Database Name", "TSL_DB")
+                db_user = st.sidebar.text_input("DB User", "tsladmin")
                 db_password = st.sidebar.text_input("DB Password", type="password")
                 
-                if st.sidebar.button("Test & Connect"):
+                if st.sidebar.button("Test & Connect") or st.session_state.get("connected_remote", False):
                     try:
                         if source_type == "PostgreSQL":
                             import psycopg2
@@ -124,6 +124,7 @@ if auth_selection == "Login":
                                 host=host, port=port, database=database, user=db_user, password=db_password, sslmode='require'
                             )
                             engine_ready = True
+                            st.session_state["connected_remote"] = True
                             st.sidebar.success("Successfully connected to cloud PostgreSQL!")
                         elif source_type == "MySQL":
                             import pymysql
@@ -131,6 +132,7 @@ if auth_selection == "Login":
                                 host=host, port=int(port), database=database, user=db_user, password=db_password
                             )
                             engine_ready = True
+                            st.session_state["connected_remote"] = True
                             st.sidebar.success("Successfully connected to MySQL!")
                         elif source_type == "SQL Server":
                             import pyodbc
@@ -138,6 +140,7 @@ if auth_selection == "Login":
                                 f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={host},{port};DATABASE={database};UID={db_user};PWD={db_password}"
                             )
                             engine_ready = True
+                            st.session_state["connected_remote"] = True
                             st.sidebar.success("Successfully connected to SQL Server!")
                     except Exception as ext_err:
                         st.sidebar.error(f"Remote connection failed: {ext_err}")
