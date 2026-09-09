@@ -1,2 +1,8 @@
 streamlit
 pandas
+streamlit-authenticator
+PyYAML
+openpyxl
+psycopg2-binary
+PyMySQL
+pyodbc
