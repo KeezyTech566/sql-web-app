@@ -55,17 +55,18 @@ if auth_selection == "Login":
                     if uploaded_file.size > 50 * 1024 * 1024:
                         st.sidebar.error("File size exceeds the 50MB production security limit.")
                     else:
-                        table_name = st.sidebar.text_input("Target Table Name", "imported_data")
+                        table_name = st.sidebar.text_input("Target Table Name", "Training_data")
                         if uploaded_file.name.endswith('.csv'):
                             df_upload = pd.read_csv(uploaded_file)
                         else:
                             df_upload = pd.read_excel(uploaded_file)
                         
-                        conn = sqlite3.connect(":memory:")
+                        # Use a persistent local db file so it survives script reruns
+                        conn = sqlite3.connect("uploaded_data.db", check_same_thread=False)
                         df_upload.to_sql(table_name, conn, index=False, if_exists="replace")
                         conn.row_factory = sqlite3.Row
                         engine_ready = True
-                        st.sidebar.success(f"Table '{table_name}' loaded in-memory.")
+                        st.sidebar.success(f"Table '{table_name}' loaded successfully!")
 
             elif source_type in ["PostgreSQL", "MySQL", "SQL Server"]:
                 st.sidebar.info(f"Configuring connection to remote {source_type} instance.")
@@ -80,6 +81,15 @@ if auth_selection == "Login":
 
         except Exception as conn_err:
             st.sidebar.error(f"Connection error: {conn_err}")
+
+        # Fallback check for persistent uploaded file connection across reruns
+        if source_type == "Upload CSV/Excel" and not engine_ready:
+            try:
+                conn = sqlite3.connect("uploaded_data.db", check_same_thread=False)
+                conn.row_factory = sqlite3.Row
+                engine_ready = True
+            except:
+                pass
 
         # --- MAIN WORKSPACE & QUERY CONSOLE ---
         st.title("Enterprise SQL Query Console")
