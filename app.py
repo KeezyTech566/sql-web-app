@@ -5,6 +5,7 @@ from yaml.loader import SafeLoader
 import sqlite3
 import pandas as pd
 import traceback
+import bcrypt
 
 st.set_page_config(page_title="Enterprise SQL Client", layout="wide", initial_sidebar_state="expanded")
 
@@ -21,10 +22,9 @@ def init_user_db():
             role TEXT
         )
     ''')
-    # Insert default admin if table is empty
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
-        default_pass = stauth.Hasher.hash("Admin123!")
+        default_pass = bcrypt.hashpw("Admin123!".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", 
                        ("admin", "admin@enterprise.com", "System Administrator", default_pass, "admin"))
         conn.commit()
@@ -32,7 +32,6 @@ def init_user_db():
 
 init_user_db()
 
-# Load users dynamically from persistent SQLite into authenticator structure
 def load_credentials_from_db():
     conn = sqlite3.connect("users.db", check_same_thread=False)
     cursor = conn.cursor()
@@ -50,7 +49,6 @@ def load_credentials_from_db():
         }
     return credentials
 
-# Load configuration cookie settings
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
@@ -208,9 +206,9 @@ elif auth_selection == "Create Account":
             elif new_username in db_credentials['usernames']:
                 st.error("Username already exists. Please choose a different one.")
             else:
-                hashed_password = stauth.Hasher.hash(new_password)
+                # Hash password securely using direct bcrypt
+                hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 
-                # Save into persistent users.db sqlite table
                 conn = sqlite3.connect("users.db", check_same_thread=False)
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)",
