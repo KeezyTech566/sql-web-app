@@ -1,0 +1,16 @@
+credentials:
+  usernames:
+    admin:
+      email: admin@enterprise.com
+      name: System Administrator
+      password: '$2b$12$1o1gZBTv8lkkSPElckDkPu.2x87aTbkpSfisGuZtk9wSWKHfxYV/' # Password is: Admin123!
+      role: admin
+    analyst:
+      email: analyst@enterprise.com
+      name: Data Analyst
+      password: '$2b$12$1o1gZBTv8lkkSPElckDkPu.2x87aTbkpSfisGuZtk9wSWKHfxYV/' # Password is: Admin123!
+      role: analyst
+cookie:
+  expiry_days: 30
+  key: 'enterprise_secure_signature_key_9988'
+  name: 'enterprise_auth_cookie'
