@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Web Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-indigo-400">⚡ SQL Web Studio</h1>
+        <span class="text-sm text-slate-400">Environment: Connected</span>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
+        
+        <!-- Query Input Section -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+            <label for="sqlInput" class="text-sm font-medium text-slate-300">SQL Command Workspace</label>
+            <textarea id="sqlInput" rows="5" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 font-mono text-sm text-emerald-400 focus:outline-none focus:border-indigo-500"
+                placeholder="SELECT * FROM table_name;"></textarea>
+            
+            <div class="flex justify-between items-center">
+                <span id="statusMessage" class="text-sm text-slate-400">Ready</span>
+                <button onclick="executeQuery()" 
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2 rounded-lg transition shadow">
+                    Run Query
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Display Section -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex-1 flex flex-col">
+            <h2 class="text-sm font-medium text-slate-300 mb-3">Result Grid</h2>
+            
+            <div id="resultContainer" class="flex-1 overflow-x-auto border border-slate-700 rounded-lg bg-slate-900 min-h-[300px]">
+                <div class="flex items-center justify-center h-full text-slate-500 text-sm">
+                    Execute a query to inspect data output.
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Script to handle API requests -->
+    <script>
+        async function executeQuery() {
+            const query = document.getElementById('sqlInput').value;
+            const statusEl = document.getElementById('statusMessage');
+            const container = document.getElementById('resultContainer');
+
+            statusEl.textContent = "Executing...";
+            statusEl.className = "text-sm text-amber-400";
+
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    throw new Error("Server returned invalid response: " + responseText);
+                }
+
+                if (!response.ok) {
+                    throw new Error(data.error || "An error occurred.");
+                }
+
+                statusEl.textContent = `Success (${data.row_count !== undefined ? data.row_count + ' rows' : 'Executed'})`;
+                statusEl.className = "text-sm text-emerald-400";
+
+                if (data.columns && data.rows) {
+                    renderTable(data.columns, data.rows);
+                } else {
+                    container.innerHTML = `<div class="p-6 text-emerald-400 text-sm">${data.message}</div>`;
+                }
+
+            } catch (err) {
+                statusEl.textContent = "Error";
+                statusEl.className = "text-sm text-rose-400";
+                container.innerHTML = `<div class="p-6 text-rose-400 text-sm font-mono whitespace-pre-wrap">${err.message}</div>`;
+            }
+        }
+
+        function renderTable(columns, rows) {
+            const container = document.getElementById('resultContainer');
+            
+            if (rows.length === 0) {
+                container.innerHTML = `<div class="p-6 text-slate-400 text-sm">Query returned zero rows.</div>`;
+                return;
+            }
+
+            let html = `<table class="w-full text-left border-collapse text-sm">`;
+            html += `<thead class="bg-slate-800 text-slate-300 border-b border-slate-700"><tr>`;
+            columns.forEach(col => {
+                html += `<th class="py-3 px-4 font-semibold">${col}</th>`;
+            });
+            html += `</tr></thead>`;
+            html += `<tbody class="divide-y divide-slate-800">`;
+            rows.forEach(row => {
+                html += `<tr class="hover:bg-slate-800/50">`;
+                columns.forEach(col => {
+                    let val = row[col] !== null ? row[col] : 'NULL';
+                    html += `<td class="py-2.5 px-4 font-mono text-slate-300">${val}</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
